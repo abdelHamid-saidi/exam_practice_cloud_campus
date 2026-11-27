@@ -1,0 +1,84 @@
+# yaml-language-server: $schema=https://render.com/schema/render.yaml.json
+# Environnement de qualification. Les services suivent la branche pre-production.
+# MongoDB n'est pas proposé par Render : MONGO_URI pointe vers MongoDB Atlas.
+
+projects:
+  - name: exam-practice-tasks
+    environments:
+      - name: qualification
+        networking:
+          isolation: enabled
+        services:
+          - type: web
+            name: exam-practice-api
+            runtime: node
+            plan: free
+            region: frankfurt
+            branch: pre-production
+            rootDir: backend
+            buildCommand: npm ci --omit=dev
+            startCommand: node server.js
+            healthCheckPath: /api/health
+            autoDeployTrigger: commit
+            buildFilter:
+              paths:
+                - backend/**
+                - render.yaml
+            envVars:
+              - key: NODE_VERSION
+                value: "20"
+              - key: NODE_ENV
+                value: production
+              - key: LOG_LEVEL
+                value: info
+              - key: LOG_TO_FILE
+                value: "false"
+              - key: JWT_SECRET
+                generateValue: true
+              - key: MONGO_URI
+                sync: false
+              - key: CORS_ORIGIN
+                fromService:
+                  name: exam-practice-web
+                  type: web
+                  envVarKey: RENDER_EXTERNAL_URL
+
+          - type: web
+            name: exam-practice-web
+            runtime: static
+            branch: pre-production
+            rootDir: frontend
+            buildCommand: npm install && npm run build
+            staticPublishPath: ./build
+            autoDeployTrigger: commit
+            buildFilter:
+              paths:
+                - frontend/**
+                - render.yaml
+            routes:
+              - type: rewrite
+                source: /*
+                destination: /index.html
+            headers:
+              - path: /*
+                name: X-Content-Type-Options
+                value: nosniff
+              - path: /*
+                name: X-Frame-Options
+                value: DENY
+              - path: /*
+                name: Referrer-Policy
+                value: no-referrer
+              - path: /*
+                name: Content-Security-Policy
+                value: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://*.onrender.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+            envVars:
+              - key: NODE_VERSION
+                value: "20"
+              - key: CI
+                value: "false"
+              - key: REACT_APP_API_URL
+                fromService:
+                  name: exam-practice-api
+                  type: web
+                  envVarKey: RENDER_EXTERNAL_URL

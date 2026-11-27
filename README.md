@@ -145,7 +145,7 @@ Ces points concernent l'infrastructure et l'automatisation.
 - **Journalisation (Logging) (E25)** : Les `console.log` actuels sont-ils suffisants ? Proposez une solution de logging plus robuste (ex: Winston, Pino) pour le backend, qui pourrait logger dans des fichiers ou envoyer les logs vers un service centralisé.
 - **Monitoring et alertes (E26)** : Comment surveiller que l'application est en bonne santé ? Proposez des outils (ex. : Prometheus, Grafana, Uptime Kuma) et définissez 2 ou 3 alertes pertinentes (ex. : « API indisponible », « latence > 500 ms », « taux d'erreur > 5 % »). Vous pouvez aussi décrire les solutions proposées par l'hébergeur choisi.
 
-- **Hébergement, DNS, Sécurité (E21, E22, E23)** : Décrivez une architecture cible sur un fournisseur cloud (ex: AWS, Azure, GCP, Scaleway...). Où hébergeriez-vous les conteneurs ? La base de données ? Comment configureriez-vous le nom de domaine et le certificat HTTPS ?
+- **Hébergement, DNS, Sécurité (E21, E22, E23)** : l'environnement de qualification est défini pour Render. L'analyse et les étapes de mise en service sont dans `docs/hebergement-render.md`. Le fichier `render.yaml` décrit le site statique et l'API sur la branche `pre-production`. La base reste sur MongoDB Atlas.
 
 ---
 

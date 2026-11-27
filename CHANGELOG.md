@@ -2,6 +2,14 @@
 
 Toutes les modifications notables de ce projet sont notées ici.
 
+## [1.2.0] - 2026-11-27
+
+### Ajouts
+
+- Environnement de qualification Render : `render.yaml` (site statique et API Node, branche `pre-production`, région Francfort).
+- Analyse du choix Render et MongoDB Atlas dans `docs/hebergement-render.md`.
+- Le client HTTP ajoute `/api` lorsque `REACT_APP_API_URL` ne contient que l'origine du service.
+
 ## [1.1.0] - 2026-11-27
 
 ### Ajouts
