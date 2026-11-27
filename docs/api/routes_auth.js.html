@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: routes/auth.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: routes/auth.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>const express = require('express');
+const router = express.Router();
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
+const logger = require('../config/logger');
+const { audit } = require('../config/logger');
+const { containsMarkup, MARKUP_MESSAGE } = require('../utils/validateInput');
+
+/**
+ * Signe un jeton valable une heure et l'envoie au client.
+ * @param {object} user Compte qui vient d'être authentifié.
+ * @param {object} res Réponse HTTP.
+ */
+function signToken(user, res) {
+  const payload = { user: { id: user.id } };
+  jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: 3600 }, (err, token) => {
+    if (err) {
+      logger.error('jwt_sign_failed', { message: err.message });
+      return res.status(500).json({ msg: 'Erreur serveur' });
+    }
+    return res.json({ token });
+  });
+}
+
+/**
+ * @route   POST /api/auth/register
+ * @desc    Crée un compte puis renvoie un jeton JWT.
+ *          Le nom d'utilisateur (3 caractères minimum) et le mot de passe
+ *          (6 à 72 caractères) sont obligatoires.
+ */
+router.post('/register', async (req, res) => {
+  const username = typeof req.body.username === 'string' ? req.body.username.trim() : '';
+  const password = typeof req.body.password === 'string' ? req.body.password : '';
+
+  if (!username || !password) {
+    audit(req, 'user_register_failed', {
+      outcome: 'failure',
+      reason: 'missing_fields',
+      username: username || null,
+      statusCode: 400,
+    });
+    return res.status(400).json({ msg: 'Veuillez renseigner le nom d\'utilisateur et le mot de passe' });
+  }
+
+  if (containsMarkup(username)) {
+    audit(req, 'user_register_failed', {
+      outcome: 'failure',
+      reason: 'validation',
+      statusCode: 400,
+    });
+    return res.status(400).json({ msg: MARKUP_MESSAGE });
+  }
+
+  if (username.length &lt; 3) {
+    audit(req, 'user_register_failed', {
+      outcome: 'failure',
+      reason: 'validation',
+      username,
+      statusCode: 400,
+    });
+    return res.status(400).json({ msg: 'Le nom d\'utilisateur doit contenir au moins 3 caractères' });
+  }
+
+  if (password.length &lt; 6) {
+    audit(req, 'user_register_failed', {
+      outcome: 'failure',
+      reason: 'validation',
+      username,
+      statusCode: 400,
+    });
+    return res.status(400).json({ msg: 'Le mot de passe doit contenir au moins 6 caractères' });
+  }
+
+  if (password.length > 72) {
+    audit(req, 'user_register_failed', {
+      outcome: 'failure',
+      reason: 'validation',
+      username,
+      statusCode: 400,
+    });
+    return res.status(400).json({ msg: 'Le mot de passe ne doit pas dépasser 72 caractères' });
+  }
+
+  try {
+    let user = await User.findOne({ username });
+    if (user) {
+      audit(req, 'user_register_failed', {
+        outcome: 'failure',
+        reason: 'duplicate',
+        username,
+        statusCode: 400,
+      });
+      return res.status(400).json({ msg: 'Ce nom d\'utilisateur est déjà utilisé' });
+    }
+
+    user = new User({ username, password });
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(password, salt);
+    await user.save();
+
+    audit(req, 'user_registered', {
+      outcome: 'success',
+      username,
+      userId: user.id,
+      statusCode: 200,
+    });
+
+    signToken(user, res);
+  } catch (err) {
+    if (err.code === 11000) {
+      audit(req, 'user_register_failed', {
+        outcome: 'failure',
+        reason: 'duplicate',
+        username,
+        statusCode: 400,
+      });
+      return res.status(400).json({ msg: 'Ce nom d\'utilisateur est déjà utilisé' });
+    }
+    logger.error('register_failed', { message: err.message, stack: err.stack });
+    res.status(500).json({ msg: 'Erreur serveur' });
+  }
+});
+
+/**
+ * @route   POST /api/auth/login
+ * @desc    Vérifie le nom d'utilisateur et le mot de passe, puis renvoie un jeton JWT.
+ *          Un formulaire vide reçoit une erreur explicite. Un échec d'authentification
+ *          reste volontairement générique.
+ */
+router.post('/login', async (req, res) => {
+  const username = typeof req.body.username === 'string' ? req.body.username.trim() : '';
+  const password = typeof req.body.password === 'string' ? req.body.password : '';
+
+  if (!username || !password) {
+    audit(req, 'user_login_failed', {
+      outcome: 'failure',
+      reason: 'missing_fields',
+      username: username || null,
+      statusCode: 400,
+    });
+    return res.status(400).json({ msg: 'Veuillez renseigner le nom d\'utilisateur et le mot de passe' });
+  }
+
+  try {
+    const user = await User.findOne({ username });
+    const isMatch = user ? await bcrypt.compare(password, user.password) : false;
+
+    if (!user || !isMatch) {
+      audit(req, 'user_login_failed', {
+        outcome: 'failure',
+        reason: 'bad_credentials',
+        username,
+        statusCode: 400,
+      });
+      return res.status(400).json({ msg: 'Nom d\'utilisateur ou mot de passe incorrect' });
+    }
+
+    audit(req, 'user_login', {
+      outcome: 'success',
+      username,
+      userId: user.id,
+      statusCode: 200,
+    });
+
+    signToken(user, res);
+  } catch (err) {
+    logger.error('login_failed', { message: err.message, stack: err.stack });
+    res.status(500).json({ msg: 'Erreur serveur' });
+  }
+});
+
+module.exports = router;
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#assertStrongJwtSecret">assertStrongJwtSecret</a></li><li><a href="global.html#audit">audit</a></li><li><a href="global.html#connectDB">connectDB</a></li><li><a href="global.html#containsMarkup">containsMarkup</a></li><li><a href="global.html#isOwner">isOwner</a></li><li><a href="global.html#signToken">signToken</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Fri Nov 27 2026 12:41:42 GMT+0100 (heure normale d’Europe centrale)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

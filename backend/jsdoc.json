@@ -1,0 +1,11 @@
+{
+  "source": {
+    "include": ["server.js", "routes", "middleware", "config", "utils"],
+    "includePattern": ".js$",
+    "excludePattern": "node_modules"
+  },
+  "opts": {
+    "destination": "../docs/api",
+    "recurse": true
+  }
+}

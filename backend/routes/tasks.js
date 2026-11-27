@@ -1,76 +1,183 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const Task = require('../models/Task');
+const logger = require('../config/logger');
+const { audit } = require('../config/logger');
+const { containsMarkup, MARKUP_MESSAGE } = require('../utils/validateInput');
 
-// @route   GET api/tasks
-// @desc    Get all user tasks
+function rejectMarkup(req, res, event) {
+  audit(req, event, {
+    outcome: 'failure',
+    reason: 'validation',
+    statusCode: 400,
+  });
+  res.status(400).json({ msg: MARKUP_MESSAGE });
+}
+
+/**
+ * Indique si la tâche appartient au compte porté par le jeton.
+ * @param {object} task
+ * @param {object} req
+ * @returns {boolean}
+ */
+function isOwner(task, req) {
+  return task.user && task.user.toString() === req.user.id;
+}
+
+function rejectForeignTask(req, res, task, event) {
+  audit(req, event, {
+    outcome: 'denied',
+    reason: 'not_owner',
+    resourceId: task.id,
+    statusCode: 403,
+  });
+  res.status(403).json({ msg: 'Accès refusé' });
+}
+
+/**
+ * Liste les tâches du compte connecté, de la plus récente à la plus ancienne.
+ * @route GET /api/tasks
+ */
 router.get('/', auth, async (req, res) => {
   try {
     const tasks = await Task.find({ user: req.user.id }).sort({ createdAt: -1 });
     res.json(tasks);
   } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server Error');
+    logger.error('tasks_list_failed', { message: err.message, stack: err.stack });
+    res.status(500).json({ msg: 'Erreur serveur' });
   }
 });
 
-// @route   POST api/tasks
-// @desc    Add a new task
+/**
+ * Crée une tâche. Le titre est obligatoire et ne peut pas contenir de HTML.
+ * @route POST /api/tasks
+ */
 router.post('/', auth, async (req, res) => {
-  const { title, description } = req.body;
+  const title = typeof req.body.title === 'string' ? req.body.title.trim() : '';
+  const description = typeof req.body.description === 'string' ? req.body.description.trim() : '';
 
-  // Un utilisateur pourrait injecter du HTML ou du script dans la description.
+  if (!title) {
+    audit(req, 'task_create_failed', {
+      outcome: 'failure',
+      reason: 'validation',
+      statusCode: 400,
+    });
+    return res.status(400).json({ msg: 'Le titre est obligatoire' });
+  }
+
+  if (containsMarkup(title) || containsMarkup(description)) {
+    return rejectMarkup(req, res, 'task_create_failed');
+  }
+
+  if (title.length > 200) {
+    return res.status(400).json({ msg: 'Le titre ne doit pas dépasser 200 caractères' });
+  }
+
   try {
-    const newTask = new Task({
+    const task = await new Task({
       title,
       description,
       user: req.user.id,
+    }).save();
+
+    audit(req, 'task_created', {
+      outcome: 'success',
+      resourceId: task.id,
+      statusCode: 200,
     });
-
-    const task = await newTask.save();
     res.json(task);
   } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server Error');
+    logger.error('task_create_failed', { message: err.message, stack: err.stack });
+    res.status(500).json({ msg: 'Erreur serveur' });
   }
 });
 
-// @route   PUT api/tasks/:id
-// @desc    Update a task
-// N'importe quel utilisateur authentifié peut modifier la tâche de n'importe qui d'autre s'il connaît l'ID de la tâche.
-// Il manque une vérification pour s'assurer que la tâche appartient bien à l'utilisateur qui fait la requête.
+/**
+ * Met à jour le titre, la description ou le statut.
+ * Seul le propriétaire peut modifier la tâche, et seuls les champs envoyés changent.
+ * @route PUT /api/tasks/:id
+ */
 router.put('/:id', auth, async (req, res) => {
-  const { title, description, isCompleted } = req.body;
-  
-  try {
-    let task = await Task.findById(req.params.id);
-    if (!task) return res.status(404).json({ msg: 'Task not found' });
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(400).json({ msg: 'Identifiant de tâche invalide' });
+  }
 
-    task = await Task.findByIdAndUpdate(req.params.id, { $set: { title, description, isCompleted } }, { new: true });
-    
-    // Ici c'est corrigé, mais c'est un bug courant à surveiller.
+  const { title, description, isCompleted } = req.body;
+
+  try {
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ msg: 'Tâche introuvable' });
+    if (!isOwner(task, req)) return rejectForeignTask(req, res, task, 'task_update_denied');
+
+    if (title !== undefined) {
+      if (typeof title !== 'string' || !title.trim()) {
+        return res.status(400).json({ msg: 'Le titre est obligatoire' });
+      }
+      if (title.trim().length > 200) {
+        return res.status(400).json({ msg: 'Le titre ne doit pas dépasser 200 caractères' });
+      }
+      if (containsMarkup(title)) {
+        return rejectMarkup(req, res, 'task_update_failed');
+      }
+      task.title = title.trim();
+    }
+
+    if (description !== undefined) {
+      const nextDescription = typeof description === 'string' ? description.trim() : '';
+      if (containsMarkup(nextDescription)) {
+        return rejectMarkup(req, res, 'task_update_failed');
+      }
+      task.description = nextDescription;
+    }
+
+    if (isCompleted !== undefined) {
+      if (typeof isCompleted !== 'boolean') {
+        return res.status(400).json({ msg: 'Le statut doit être un booléen' });
+      }
+      task.isCompleted = isCompleted;
+    }
+
+    await task.save();
+
+    audit(req, 'task_updated', {
+      outcome: 'success',
+      resourceId: task.id,
+      statusCode: 200,
+    });
     res.json(task);
   } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server Error');
+    logger.error('task_update_failed', { message: err.message, stack: err.stack });
+    res.status(500).json({ msg: 'Erreur serveur' });
   }
 });
 
-// @route   DELETE api/tasks/:id
-// @desc    Delete a task
-// Un utilisateur peut supprimer les tâches des autres.
+/**
+ * Supprime une tâche du compte connecté.
+ * @route DELETE /api/tasks/:id
+ */
 router.delete('/:id', auth, async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(400).json({ msg: 'Identifiant de tâche invalide' });
+  }
+
   try {
-    let task = await Task.findById(req.params.id);
-    if (!task) return res.status(404).json({ msg: 'Task not found' });
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ msg: 'Tâche introuvable' });
+    if (!isOwner(task, req)) return rejectForeignTask(req, res, task, 'task_delete_denied');
 
-    await Task.findByIdAndRemove(req.params.id);
+    await task.deleteOne();
 
-    res.json({ msg: 'Task removed' });
+    audit(req, 'task_deleted', {
+      outcome: 'success',
+      resourceId: req.params.id,
+      statusCode: 200,
+    });
+    res.json({ msg: 'Tâche supprimée' });
   } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server Error');
+    logger.error('task_delete_failed', { message: err.message, stack: err.stack });
+    res.status(500).json({ msg: 'Erreur serveur' });
   }
 });
 

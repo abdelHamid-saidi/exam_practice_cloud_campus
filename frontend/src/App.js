@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   BrowserRouter as Router,
   Route,
@@ -8,15 +8,13 @@ import {
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 
-// La page n'a pas de style cohérent
-// => ajouter un fichier CSS pour gérer les styles de la page
-// => importer le fichier CSS dans le composant App
 import "./App.css";
 import Tasks from "./pages/Tasks";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 
-// Comment pourrait-on gérer les routes protégées qui nécessitent d'être connecté ?
+// Coque de l'application : en-tête, pages et session.
+// Le jeton est lu dans localStorage. Sans session, /tasks renvoie vers la connexion.
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(
     !!localStorage.getItem("token")
@@ -27,12 +25,12 @@ function App() {
     setIsAuthenticated(!!token);
   }, []);
 
-  const handleLogin = () => setIsAuthenticated(true);
+  const handleLogin = useCallback(() => setIsAuthenticated(true), []);
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     localStorage.removeItem("token");
     setIsAuthenticated(false);
-  };
+  }, []);
 
   return (
     <Router>
@@ -43,9 +41,23 @@ function App() {
         <main>
           <Routes>
             <Route path="/" element={<Navigate to="/login" />} />
-            <Route path="/login" element={<Login onLogin={handleLogin} />} />
+            <Route
+              path="/login"
+              element={
+                isAuthenticated ? <Navigate to="/tasks" /> : <Login onLogin={handleLogin} />
+              }
+            />
             <Route path="/register" element={<Register />} />
-            <Route path="/tasks" element={<Tasks />} />
+            <Route
+              path="/tasks"
+              element={
+                isAuthenticated ? (
+                  <Tasks onAuthError={handleLogout} />
+                ) : (
+                  <Navigate to="/login" />
+                )
+              }
+            />
           </Routes>
         </main>
         <Footer />

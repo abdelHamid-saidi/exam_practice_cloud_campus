@@ -1,3 +1,9 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   mongo:
     image: mongo:7
@@ -9,6 +15,7 @@ services:
       MONGO_INITDB_DATABASE: exam_practice_db
     volumes:
       - mongo_data:/data/db
+    logging: *default-logging
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
       interval: 10s
@@ -26,7 +33,17 @@ services:
     environment:
       PORT: 5000
       MONGO_URI: mongodb://mongo:27017/exam_practice_db
-      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      JWT_SECRET: ${JWT_SECRET:?Definir JWT_SECRET dans le fichier .env a la racine (32 caracteres minimum)}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000,http://127.0.0.1:3000}
+      LOG_LEVEL: info
+      LOG_TO_FILE: "true"
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5000/api/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     depends_on:
       mongo:
         condition: service_healthy
@@ -40,6 +57,7 @@ services:
     restart: unless-stopped
     ports:
       - "3000:80"
+    logging: *default-logging
     depends_on:
       - backend
 

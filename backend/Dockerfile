@@ -7,7 +7,8 @@ RUN npm ci --omit=dev
 
 COPY . .
 
-RUN addgroup -S app && adduser -S app -G app \
+RUN mkdir -p /app/logs \
+  && addgroup -S app && adduser -S app -G app \
   && chown -R app:app /app
 USER app
 

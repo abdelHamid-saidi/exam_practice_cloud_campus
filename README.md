@@ -5,6 +5,8 @@ Bienvenue sur le projet d'entraînement pour l'évaluation "Mise en production e
 
 **Important** : Cette application a été intentionnellement conçue avec des bugs, des failles de sécurité et des mauvaises pratiques. La mission est de l'améliorer en suivant les consignes ci-dessous et de la mettre en production.
 
+Les évolutions sont notées dans `CHANGELOG.md`. La documentation de l'API se génère avec `cd backend && npm run docs`, puis s'ouvre dans `docs/api/index.html`.
+
 ## 1. Installation et lancement
 
 Deux modes sont possibles. Ils utilisent les mêmes ports : ne les lancez pas en même temps.
@@ -34,10 +36,14 @@ Compose démarre trois services :
 Le secret JWT n'est pas copié dans l'image. Pour le définir, créez un fichier `.env` à la racine avant le démarrage :
 
 ```
-JWT_SECRET=un-secret-long-et-aleatoire
+JWT_SECRET=une-valeur-aleatoire-d-au-moins-32-caracteres
 ```
 
-Sans ce fichier, Compose utilise la valeur de repli `change-me-in-production`.
+Compose refuse de démarrer sans cette variable. Le serveur refuse aussi un secret trop court ou une valeur connue (`secretkey123`, `change-me-in-production`). Générez-le avec :
+
+```bash
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+```
 
 Commandes utiles :
 
@@ -57,8 +63,11 @@ Le backend lit `backend/.env` :
 
 ```
 MONGO_URI=mongodb://localhost:27017/exam_practice_db
-JWT_SECRET=secretkey123
+JWT_SECRET=une-valeur-aleatoire-d-au-moins-32-caracteres
+CORS_ORIGIN=http://localhost:3000,http://127.0.0.1:3000
 ```
+
+Le secret doit être propre à l'environnement. Ne le commitez pas : `.env` est ignoré par Git.
 
 Cette URI `localhost` ne convient qu'à ce mode. Dans un conteneur, `localhost` désigne le conteneur lui-même.
 

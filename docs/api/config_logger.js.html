@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: config/logger.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: config/logger.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>const fs = require('fs');
+const path = require('path');
+const winston = require('winston');
+
+const logDir = path.join(__dirname, '..', 'logs');
+const level = process.env.LOG_LEVEL || 'info';
+
+const SENSITIVE_KEYS = ['password', 'token', 'authorization', 'jwt', 'secret', 'cookie'];
+
+const redactFormat = winston.format((info) => {
+  for (const key of Object.keys(info)) {
+    if (SENSITIVE_KEYS.includes(String(key).toLowerCase())) {
+      info[key] = '[REDACTED]';
+    }
+  }
+  return info;
+});
+
+const jsonFormat = winston.format.combine(
+  winston.format.timestamp(),
+  winston.format.errors({ stack: true }),
+  redactFormat(),
+  winston.format.json()
+);
+
+const consoleFormat = process.env.NODE_ENV === 'production'
+  ? jsonFormat
+  : winston.format.combine(
+      winston.format.timestamp({ format: 'HH:mm:ss' }),
+      winston.format.errors({ stack: true }),
+      redactFormat(),
+      winston.format.colorize(),
+      winston.format.printf((info) => {
+        const { timestamp, level: lvl, message, stack, service, ...meta } = info;
+        const extra = Object.keys(meta).length ? ` ${JSON.stringify(meta)}` : '';
+        return `${timestamp} ${lvl} ${message}${stack ? `\n${stack}` : ''}${extra}`;
+      })
+    );
+
+function fileLoggingEnabled() {
+  if (process.env.LOG_TO_FILE === 'false') return false;
+  try {
+    fs.mkdirSync(logDir, { recursive: true });
+    fs.accessSync(logDir, fs.constants.W_OK);
+    return true;
+  } catch (err) {
+    console.error(`Journal fichier indisponible (${err.message}). Sortie console uniquement.`);
+    return false;
+  }
+}
+
+const writeFiles = fileLoggingEnabled();
+
+function fileTransport(filename, options = {}) {
+  return new winston.transports.File({
+    filename: path.join(logDir, filename),
+    maxsize: 5 * 1024 * 1024,
+    maxFiles: 5,
+    tailable: true,
+    ...options,
+  });
+}
+
+const appTransports = [new winston.transports.Console({ format: consoleFormat })];
+if (writeFiles) {
+  appTransports.push(
+    fileTransport('error.log', { level: 'error', format: jsonFormat }),
+    fileTransport('combined.log', { format: jsonFormat })
+  );
+}
+
+const logger = winston.createLogger({
+  level,
+  exitOnError: false,
+  defaultMeta: { service: 'task-api' },
+  format: jsonFormat,
+  transports: appTransports,
+});
+
+const auditTransports = [new winston.transports.Console({ format: consoleFormat })];
+if (writeFiles) {
+  auditTransports.push(fileTransport('audit.log', { format: jsonFormat }));
+}
+
+const auditLogger = winston.createLogger({
+  level: 'info',
+  exitOnError: false,
+  defaultMeta: { service: 'task-api', channel: 'audit' },
+  format: jsonFormat,
+  transports: auditTransports,
+});
+
+/**
+ * Enregistre une action sensible (connexion, tâche, refus d'accès).
+ * Le mot de passe et le jeton sont retirés avant l'écriture.
+ * @param {object} req Requête en cours.
+ * @param {string} event Nom de l'événement, par exemple user_login.
+ * @param {object} [fields] Détails : outcome, reason, userId, username, resourceId, statusCode.
+ */
+function audit(req, event, fields = {}) {
+  const safe = { ...fields };
+  delete safe.password;
+  delete safe.token;
+
+  auditLogger.info(event, {
+    outcome: safe.outcome || 'success',
+    reason: safe.reason || null,
+    userId: safe.userId || req.user?.id || null,
+    username: safe.username || null,
+    resourceId: safe.resourceId || null,
+    statusCode: safe.statusCode || null,
+    ip: req.ip || null,
+    method: req.method,
+    path: req.originalUrl,
+  });
+}
+
+logger.info('logging_ready', {
+  level,
+  fileLogging: writeFiles,
+  logDir: writeFiles ? logDir : null,
+});
+
+module.exports = logger;
+module.exports.audit = audit;
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#assertStrongJwtSecret">assertStrongJwtSecret</a></li><li><a href="global.html#audit">audit</a></li><li><a href="global.html#connectDB">connectDB</a></li><li><a href="global.html#containsMarkup">containsMarkup</a></li><li><a href="global.html#isOwner">isOwner</a></li><li><a href="global.html#signToken">signToken</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Fri Nov 27 2026 12:41:42 GMT+0100 (heure normale d’Europe centrale)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

@@ -106,14 +106,19 @@ header nav ul li {
   margin: 0 15px;
 }
 
-header nav ul li a {
+header nav ul li a,
+header nav ul li button.nav-link {
   color: white;
   text-decoration: none;
   font-weight: bold;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: inherit;
 }
 
 footer {
-  width: 100vw;
+  width: 100%;
   background: #222;
   color: #fff;
   text-align: center;
@@ -129,7 +134,7 @@ footer {
 }
 
 header {
-  width: 100vw;
+  width: 100%;
   position: fixed;
   top: 0;
   left: 0;
@@ -146,6 +151,87 @@ main {
   background: #f5f5f5;
   min-width: 0;
   display: flex;
-  justify-content: center; /* centre horizontalement */
-  align-items: center;     /* centre verticalement */
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.alert {
+  padding: 10px 12px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+}
+
+.alert-error {
+  background: #fdecea;
+  color: #b42318;
+}
+
+.alert-success {
+  background: #e8f6ee;
+  color: #067647;
+}
+
+.auth-links {
+  text-align: center;
+  margin-top: 16px;
+}
+
+.auth-links a {
+  color: #007bff;
+  font-weight: 600;
+}
+
+.tasks-page {
+  max-width: 680px;
+}
+
+.empty-state {
+  text-align: center;
+  color: #666;
+}
+
+.task-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  margin-right: 8px;
+}
+
+.task-actions,
+.task-edit {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.task-edit {
+  flex: 1;
+}
+
+.task-edit input {
+  flex: 1;
+  min-width: 120px;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.task-item button {
+  width: auto;
+  font-size: 13px;
+}
+
+.task-item button.btn-secondary {
+  background: #6c757d;
+}
+
+.task-item button.btn-secondary:hover {
+  background: #5a6268;
+}
+
+.btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }

@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import "./Header.css";
 
+// Barre de navigation. Affiche Inscription et Connexion, ou Déconnexion si une session est ouverte.
 const Header = ({ isAuthenticated, onLogout }) => {
   return (
     <header className="header">
@@ -13,14 +14,21 @@ const Header = ({ isAuthenticated, onLogout }) => {
             </Link>
           </li>
           {!isAuthenticated ? (
-            <li className="nav-item">
-              <Link to="/login" className="nav-link">
-                Connexion
-              </Link>
-            </li>
+            <>
+              <li className="nav-item">
+                <Link to="/login" className="nav-link">
+                  Connexion
+                </Link>
+              </li>
+              <li className="nav-item">
+                <Link to="/register" className="nav-link">
+                  Inscription
+                </Link>
+              </li>
+            </>
           ) : (
             <li className="nav-item">
-              <button onClick={onLogout} className="nav-link">
+              <button type="button" onClick={onLogout} className="nav-link">
                 Déconnexion
               </button>
             </li>
