@@ -3,40 +3,82 @@
 
 Bienvenue sur le projet d'entraînement pour l'évaluation "Mise en production et maintenance applicative". Cette application est une simple "To-Do List" composée d'un frontend en React et d'un backend en Node.js/Express.
 
-**Important** : Cette application a été intentionnellement conçue avec des bugs, des failles de sécurité et des mauvaises pratiques. Votre mission est de l'améliorer en suivant les consignes ci dessous et de faire la mise en production.
+**Important** : Cette application a été intentionnellement conçue avec des bugs, des failles de sécurité et des mauvaises pratiques. La mission est de l'améliorer en suivant les consignes ci-dessous et de la mettre en production.
 
-## 1. Installation et Lancement
+## 1. Installation et lancement
 
-Ce projet utilise Node.js et MongoDB. Assurez-vous qu'ils sont installés sur votre système.
+Deux modes sont possibles. Ils utilisent les mêmes ports : ne les lancez pas en même temps.
 
-### a. Backend
+| Service | URL |
+|---|---|
+| Application | http://localhost:3000 |
+| API | http://localhost:5000 |
+| MongoDB | `localhost:27017` (base `exam_practice_db`) |
+
+### a. Docker (environnement complet)
+
+Prérequis : Docker Desktop.
+
+À la racine du projet :
 
 ```bash
-# Allez dans le dossier du backend
+docker compose up -d --build
+```
+
+Compose démarre trois services :
+
+- **mongo** : image `mongo:7`, données conservées dans le volume `mongo_data`. Le backend attend que MongoDB réponde avant de démarrer.
+- **backend** : image construite depuis `backend/Dockerfile` (Node 20). `MONGO_URI` pointe vers le service `mongo`, pas vers `localhost`.
+- **frontend** : image construite depuis `frontend/Dockerfile` (build React, puis Nginx). Nginx sert l'interface sur le port 80 du conteneur, publié en `3000`, et relaie `/api` vers le backend.
+
+Le secret JWT n'est pas copié dans l'image. Pour le définir, créez un fichier `.env` à la racine avant le démarrage :
+
+```
+JWT_SECRET=un-secret-long-et-aleatoire
+```
+
+Sans ce fichier, Compose utilise la valeur de repli `change-me-in-production`.
+
+Commandes utiles :
+
+```bash
+docker compose ps
+docker compose logs -f backend
+docker compose down
+```
+
+`docker compose down` arrête les conteneurs. Le volume `mongo_data` est conservé. Ajoutez `-v` pour supprimer aussi les données.
+
+### b. Lancement local (sans Docker)
+
+Prérequis : Node.js et un MongoDB démarré sur le port 27017.
+
+Le backend lit `backend/.env` :
+
+```
+MONGO_URI=mongodb://localhost:27017/exam_practice_db
+JWT_SECRET=secretkey123
+```
+
+Cette URI `localhost` ne convient qu'à ce mode. Dans un conteneur, `localhost` désigne le conteneur lui-même.
+
+Backend :
+
+```bash
 cd backend
-
-# Installez les dépendances
 npm install
-
-# Lancez le serveur (il se connectera à MongoDB)
-# Assurez-vous que votre service MongoDB est démarré
 npm start
-# Le serveur tournera sur http://localhost:5000
 ```
 
-### b. Frontend
+Frontend, dans un autre terminal :
 
 ```bash
-# Depuis un autre terminal, allez dans le dossier du frontend
 cd frontend
-
-# Installez les dépendances
 npm install
-
-# Lancez l'application React
 npm start
-# L'application s'ouvrira sur http://localhost:3000
 ```
+
+Sans variable `REACT_APP_API_URL`, le frontend appelle `http://localhost:5000/api`. Dans l'image Docker, cette variable vaut `/api`.
 
 ---
 
@@ -77,7 +119,7 @@ Le code n'est pas documenté et il n'y a pas de suivi des changements.
 - **Documentation du code source** : Comment pourriez-vous documenter les fonctions, les routes de l'API et les composants React ? Des outils comme **JSDoc** (`/** ... */`) pour le backend JavaScript et les commentaires standards pour React peuvent être utilisés.
 - **Journal des évolutions (Changelog)** : Vous allez apporter des modifications. Comment les tracer ? Créez un fichier `CHANGELOG.md` à la racine du projet et documentez-y chaque bug et faille de sécurité que vous corrigez.
 - **Action :**
-    1.  Documentez au moins une route de l'API backend et un composant React frontend en utilisant les commentaires de documentation (fournir des precisions sur ce que vous avez fait ..).
+    1.  Documentez au moins une route de l'API backend et un composant React frontend en utilisant les commentaires de documentation (précisez ce qui a été fait).
     2.  Créez et maintenez un `CHANGELOG.md`.
 
 ### ✓ E21 à E26 – Déploiement, CI/CD, Monitoring
@@ -85,14 +127,14 @@ Le code n'est pas documenté et il n'y a pas de suivi des changements.
 Ces points concernent l'infrastructure et l'automatisation.
 
 **Pistes de réflexion :**
-- **Conteneurisation (E24)** : Comment mettriez-vous cette application (frontend et backend) dans des conteneurs Docker ? Créez un `Dockerfile` pour le backend et un autre pour le frontend. Créez un fichier `docker-compose.yml` pour orchestrer les deux services ainsi qu'une base de données MongoDB.
+- **Conteneurisation (E24)** : en place. `backend/Dockerfile` et `frontend/Dockerfile` construisent les deux applications. `docker-compose.yml` orchestre ces services avec MongoDB. Le détail du lancement est dans la section 1.
 - **CI/CD (E24)** : Comment automatiser le déploiement ? Écrivez un petit script `deploy.sh` ou décrivez les étapes d'un pipeline (ex: GitHub Actions, GitLab CI) qui pourrait :
     1.  Installer les dépendances.
     2.  Lancer les tests (que vous pourriez écrire !).
     3.  Construire les images Docker.
     4.  Pousser les images vers un registre (Docker Hub, etc.).
 - **Journalisation (Logging) (E25)** : Les `console.log` actuels sont-ils suffisants ? Proposez une solution de logging plus robuste (ex: Winston, Pino) pour le backend, qui pourrait logger dans des fichiers ou envoyer les logs vers un service centralisé.
-- **Monitoring et Alertes (E26)** : Comment surveiller que votre application est en bonne santé ? Proposez des outils (ex: Prometheus, Grafana, Uptime Kuma) et définissez 2 ou 3 alertes pertinentes (ex: "API down", "Latence > 500ms", "Taux d'erreur > 5%" ...) - sinon vous pourrez utiliser et decrire le solutions proposer pour le service d'hebergement que vous avez choisi
+- **Monitoring et alertes (E26)** : Comment surveiller que l'application est en bonne santé ? Proposez des outils (ex. : Prometheus, Grafana, Uptime Kuma) et définissez 2 ou 3 alertes pertinentes (ex. : « API indisponible », « latence > 500 ms », « taux d'erreur > 5 % »). Vous pouvez aussi décrire les solutions proposées par l'hébergeur choisi.
 
 - **Hébergement, DNS, Sécurité (E21, E22, E23)** : Décrivez une architecture cible sur un fournisseur cloud (ex: AWS, Azure, GCP, Scaleway...). Où hébergeriez-vous les conteneurs ? La base de données ? Comment configureriez-vous le nom de domaine et le certificat HTTPS ?
 
