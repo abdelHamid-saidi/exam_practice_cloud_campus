@@ -5,7 +5,6 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test",
     "audit": "npm audit --audit-level=moderate",
     "docs": "jsdoc -c jsdoc.json"
   },

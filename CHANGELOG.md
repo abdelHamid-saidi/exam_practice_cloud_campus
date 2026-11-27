@@ -2,15 +2,6 @@
 
 Toutes les modifications notables de ce projet sont notées ici.
 
-## [1.2.0] - 2026-11-27
-
-### Ajouts
-
-- Pipeline GitHub Actions (`.github/workflows/ci-cd.yml`) : tests, audit du backend, construction des images, publication sur GHCR.
-- Déploiement automatisé de la pré-production (branche `develop`, port 8080) et de la production (branche `main`, port 80). Un lancement manuel permet de redéployer l'un ou l'autre.
-- `deploy/deploy.sh` et `deploy/docker-compose.yml` : mise à jour des conteneurs sur le serveur, puis contrôle de `GET /api/health`.
-- Tests du filtre anti-HTML (`npm test` dans `backend`).
-
 ## [1.1.0] - 2026-11-27
 
 ### Ajouts

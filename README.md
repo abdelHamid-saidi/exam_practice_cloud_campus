@@ -89,55 +89,6 @@ npm start
 
 Sans variable `REACT_APP_API_URL`, le frontend appelle `http://localhost:5000/api`. Dans l'image Docker, cette variable vaut `/api`.
 
-### c. Pré-production et production
-
-Le workflow `.github/workflows/ci-cd.yml` enchaîne les tests, la construction des images et le déploiement.
-
-| Déclencheur | Environnement | Tag d'image |
-|---|---|---|
-| Pull request | aucun déploiement | construction seule |
-| Push sur `develop` | `preproduction` | `preprod` et `sha-<commit>` |
-| Push sur `main` | `production` | `prod` et `sha-<commit>` |
-| Lancement manuel (Actions → CI/CD) | choix `preproduction` ou `production` | le tag du commit lancé |
-
-Les images sont publiées sur GitHub Container Registry : `ghcr.io/<propriétaire>/<dépôt>/backend` et `.../frontend`. Le serveur tire le tag `sha-<commit>`, qui ne bouge pas. Les tags `preprod` et `prod` désignent le dernier déploiement de chaque canal.
-
-Le serveur cible a besoin de Docker Engine, du plugin Compose v2 et de curl. Le déploiement copie `deploy/docker-compose.yml` et `deploy/deploy.sh` vers `/opt/exam-practice/<environnement>`, écrit un `.env` lisible seulement par le compte de déploiement, puis démarre la stack. Pré-production écoute sur le port **8080**, production sur le port **80**. MongoDB reste sur le réseau interne des conteneurs. Les deux environnements peuvent partager une machine : les volumes et les conteneurs sont séparés par le nom de projet Compose.
-
-Contrôle après démarrage : `GET /api/health` doit répondre `{"status":"ok"}`. Sinon le script affiche les journaux et s'arrête en erreur.
-
-Secrets à créer dans GitHub (Settings → Environments), avec des valeurs **différentes** pour `preproduction` et `production` :
-
-| Nom | Rôle |
-|---|---|
-| `DEPLOY_HOST` | Adresse du serveur |
-| `DEPLOY_USER` | Compte SSH, membre du groupe `docker` |
-| `DEPLOY_SSH_KEY` | Clé privée, retours à la ligne conservés |
-| `DEPLOY_PORT` | Port SSH, facultatif (22 par défaut) |
-| `JWT_SECRET` | Secret d'au moins 32 caractères |
-
-Variables du même environnement :
-
-| Nom | Rôle |
-|---|---|
-| `CORS_ORIGIN` | Origine publique, par exemple `https://preprod.exemple.fr` |
-| `HTTP_PORT` | Facultatif. 8080 en pré-production, 80 en production |
-| `APP_URL` | Facultatif. Lien affiché sur le déploiement GitHub |
-
-Pour exiger une validation humaine avant la production : Environments → `production` → Required reviewers. Le job attend alors l'approbation.
-
-Tant que les secrets et `CORS_ORIGIN` ne sont pas renseignés, le workflow publie les images et signale le déploiement comme ignoré.
-
-Déploiement manuel sur un serveur déjà préparé :
-
-```bash
-cp deploy/.env.example deploy/.env
-# renseigner les images, JWT_SECRET, CORS_ORIGIN, HTTP_PORT, ENVIRONMENT
-bash deploy/deploy.sh
-```
-
-Pour tirer une image privée à la main, définir `GHCR_USER` et `GHCR_PULL_TOKEN` (jeton `read:packages`) dans ce `.env`. Revenir à un commit précédent : relancer le workflow sur ce commit, ou fixer `BACKEND_IMAGE` et `FRONTEND_IMAGE` sur le tag `sha-<commit>` correspondant.
-
 ---
 
 ## 2. Mission pour les Étudiants
@@ -186,7 +137,11 @@ Ces points concernent l'infrastructure et l'automatisation.
 
 **Pistes de réflexion :**
 - **Conteneurisation (E24)** : en place. `backend/Dockerfile` et `frontend/Dockerfile` construisent les deux applications. `docker-compose.yml` orchestre ces services avec MongoDB. Le détail du lancement est dans la section 1.
-- **CI/CD (E24)** : le pipeline est dans `.github/workflows/ci-cd.yml` et `deploy/deploy.sh`. Il installe les dépendances, lance les tests, construit les images, les publie sur GHCR, puis déploie la pré-production (`develop`) et la production (`main`). Le détail des secrets et des ports est dans la section 1.c.
+- **CI/CD (E24)** : Comment automatiser le déploiement ? Écrivez un petit script `deploy.sh` ou décrivez les étapes d'un pipeline (ex: GitHub Actions, GitLab CI) qui pourrait :
+    1.  Installer les dépendances.
+    2.  Lancer les tests (que vous pourriez écrire !).
+    3.  Construire les images Docker.
+    4.  Pousser les images vers un registre (Docker Hub, etc.).
 - **Journalisation (Logging) (E25)** : Les `console.log` actuels sont-ils suffisants ? Proposez une solution de logging plus robuste (ex: Winston, Pino) pour le backend, qui pourrait logger dans des fichiers ou envoyer les logs vers un service centralisé.
 - **Monitoring et alertes (E26)** : Comment surveiller que l'application est en bonne santé ? Proposez des outils (ex. : Prometheus, Grafana, Uptime Kuma) et définissez 2 ou 3 alertes pertinentes (ex. : « API indisponible », « latence > 500 ms », « taux d'erreur > 5 % »). Vous pouvez aussi décrire les solutions proposées par l'hébergeur choisi.
 
