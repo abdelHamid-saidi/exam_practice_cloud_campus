@@ -1,0 +1,60 @@
+# Stack d'exécution pour un serveur déjà provisionné.
+# Les images viennent du registre (pas de build sur la machine cible).
+# Le nom de projet Compose isole pré-production et production sur le même hôte.
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: exam_practice_db
+    volumes:
+      - mongo_data:/data/db
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  backend:
+    image: ${BACKEND_IMAGE:?Définir BACKEND_IMAGE}
+    restart: unless-stopped
+    environment:
+      PORT: 5000
+      NODE_ENV: production
+      MONGO_URI: mongodb://mongo:27017/exam_practice_db
+      JWT_SECRET: ${JWT_SECRET:?Définir JWT_SECRET}
+      CORS_ORIGIN: ${CORS_ORIGIN:?Définir CORS_ORIGIN}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_TO_FILE: "true"
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5000/api/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  frontend:
+    image: ${FRONTEND_IMAGE:?Définir FRONTEND_IMAGE}
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+    logging: *default-logging
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  mongo_data:
