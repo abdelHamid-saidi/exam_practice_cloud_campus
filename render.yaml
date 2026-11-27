@@ -1,6 +1,7 @@
 # yaml-language-server: $schema=https://render.com/schema/render.yaml.json
 # Environnement de qualification. Les services suivent la branche pre-production.
-# MongoDB n'est pas proposé par Render : MONGO_URI pointe vers MongoDB Atlas.
+# MongoDB n'est pas proposé par Render.
+# Coller MONGODB_URI tel qu'Atlas le fournit. Le serveur ajoute MONGO_DB_NAME.
 
 projects:
   - name: exam-practice-tasks
@@ -35,8 +36,10 @@ projects:
                 value: "false"
               - key: JWT_SECRET
                 generateValue: true
-              - key: MONGO_URI
+              - key: MONGODB_URI
                 sync: false
+              - key: MONGO_DB_NAME
+                value: exam_practice_preprod
               - key: CORS_ORIGIN
                 fromService:
                   name: exam-practice-web

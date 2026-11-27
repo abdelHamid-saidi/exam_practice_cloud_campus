@@ -64,11 +64,13 @@ Les en-têtes du site reprennent ceux de Nginx (`X-Content-Type-Options`, `X-Fra
 
 La base Atlas de qualification s'appelle `exam_practice_preprod`. Elle ne sert pas au développement local ni à la future production.
 
-`MONGO_URI` a la forme :
+Sur Render, coller la variable `MONGODB_URI` exactement comme Atlas la génère, sans ajouter le nom de la base :
 
 ```
-mongodb+srv://<utilisateur>:<mot-de-passe>@<cluster>.mongodb.net/exam_practice_preprod?retryWrites=true&w=majority
+mongodb+srv://<utilisateur>:<mot-de-passe>@<cluster>.mongodb.net
 ```
+
+Le Blueprint fixe `MONGO_DB_NAME` à `exam_practice_preprod`. Au démarrage, l'API complète l'URI. `MONGODB_USERNAME` et `MONGODB_PASSWORD` ne sont utiles que si l'URI n'a pas déjà d'identifiants. En local et avec Docker, `MONGO_URI` continue de primer et n'est pas modifiée quand elle contient déjà un nom de base.
 
 Le plan gratuit de Render n'a pas d'adresse IP de sortie fixe. Atlas doit donc autoriser `0.0.0.0/0` pour cette qualification. Le compte Atlas n'a que les droits sur cette base. Le mot de passe n'est pas commité : Render le demande au moment de la création (`sync: false`).
 
@@ -116,7 +118,7 @@ git push -u origin pre-production
 ```
 
 3. Dans le tableau de bord Render : **New → Blueprint**, choisir le dépôt, puis appliquer `render.yaml`.
-4. Quand Render demande `MONGO_URI`, coller la chaîne Atlas.
+4. Quand Render demande `MONGODB_URI`, coller la chaîne Atlas telle quelle (`mongodb+srv://...mongodb.net`, sans nom de base).
 5. Attendre que les deux services soient verts. Ouvrir l'URL du site `exam-practice-web`.
 6. Créer un compte, une tâche, la modifier, la supprimer. Vérifier `https://<api>.onrender.com/api/health` : la réponse attendue est `{"status":"ok","db":"up"}`.
 
