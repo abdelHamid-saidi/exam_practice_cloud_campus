@@ -14,9 +14,9 @@ Render publie le frontend comme site statique et l'API comme service web Node.js
 |---|---|
 | Deux composants déjà séparés (React et Express) | Un site statique et un service web, décrits ensemble dans `render.yaml` |
 | MongoDB et Mongoose déjà en place | Atlas parle le même protocole. Aucune réécriture de la persistance |
-| Branche `pre-production` distincte de la future production | Chaque service du Blueprint est fixé sur cette branche |
+| Branche `pre-production` distincte de `production` | Qualification et production sont deux environnements du même Blueprint |
 | HTTPS et nom d'accès | Certificat géré par Render sur `*.onrender.com` |
-| Secret JWT hors du dépôt | `JWT_SECRET` est généré par Render. `MONGO_URI` est saisi dans le tableau de bord |
+| Secret JWT hors du dépôt | `JWT_SECRET` est généré par Render. `MONGODB_URI` est saisi dans le tableau de bord |
 | Contrôle de santé | `GET /api/health` vérifie l'API et MongoDB |
 | Journaux | Winston écrit en JSON sur la sortie standard. Render les conserve. Les fichiers locaux sont coupés (`LOG_TO_FILE=false`) car le disque du service est éphémère |
 
@@ -56,13 +56,13 @@ Le site statique ne proxifie pas l'API : ce ne sont que des fichiers. Le navigat
 - `REACT_APP_API_URL` reçoit `RENDER_EXTERNAL_URL` de l'API. Le client ajoute `/api` si le chemin n'y est pas déjà.
 - `CORS_ORIGIN` reçoit l'URL publique du site. Toute autre origine est refusée.
 
-Le réseau privé de l'environnement `qualification` est isolé. L'API n'a pas à joindre un autre service Render : Atlas est atteint par l'Internet public. L'isolation empêche un futur environnement de production d'entrer sur ce réseau privé.
+Le réseau privé de l'environnement `qualification` est isolé, comme celui de `production`. L'API n'a pas à joindre un autre service Render : Atlas est atteint par l'Internet public. L'isolation empêche la production d'entrer sur le réseau de qualification.
 
 Les en-têtes du site reprennent ceux de Nginx (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, Content-Security-Policy). `connect-src` autorise `https://*.onrender.com`, car l'API n'est pas sur la même origine. Les routes du client (`/login`, `/register`, `/tasks`) sont renvoyées vers `index.html`.
 
 ## Données et secrets
 
-La base Atlas de qualification s'appelle `exam_practice_preprod`. Elle ne sert pas au développement local ni à la future production.
+La base Atlas de qualification s'appelle `exam_practice_preprod`. Elle ne sert pas au développement local. La production utilise `exam_practice_prod`.
 
 Sur Render, coller la variable `MONGODB_URI` exactement comme Atlas la génère, sans ajouter le nom de la base :
 
@@ -95,33 +95,45 @@ La production aurait son propre nom (`app.exemple.fr`, `api.exemple.fr`) et n'ut
 | API indisponible | Échec du health check Render, `GET /api/health` en 503 | Deux échecs de suite |
 | MongoDB injoignable | Journal `mongodb_connection_failed`, health check `db: down` | Dès le premier échec au démarrage |
 | Erreurs serveur | Journaux Render, niveau `error` | Plus de 5 % des requêtes sur 15 minutes |
-| Lenteur au réveil | Première requête après veille | Attendu sur le plan gratuit. En production, passer sur un plan qui ne s'endort pas |
+| Lenteur au réveil | Première requête après veille | Attendu sur le plan gratuit de la qualification. Le plan `starter` de la production ne s'endort pas |
 
-## Ce qui changerait en production
+## Environnement de production
 
-La production reprendrait le même Blueprint dans un environnement `production`, branche `production`, avec une autre base Atlas.
+Le Blueprint décrit un second environnement, `production`, suivi depuis la branche `production`.
 
-- Plan d'API au moins `0.5c-512mb`, sans mise en veille.
-- Adresses IP de sortie fixes, liste Atlas limitée à ces adresses. Retirer `0.0.0.0/0`.
-- Noms de domaine dédiés et `CORS_ORIGIN` limité à ces noms.
-- Sauvegardes Atlas activées. La M0 ne les fournit pas.
-- Secret JWT distinct de celui de qualification.
+| | Qualification | Production |
+|---|---|---|
+| Branche | `pre-production` | `production` |
+| API | `exam-practice-api`, plan `free` (s'endort) | `exam-practice-api-prod`, plan `starter` (0,5 CPU, 512 Mo, sans veille) |
+| Site | `exam-practice-web` | `exam-practice-web-prod` |
+| Base Atlas | `exam_practice_preprod` | `exam_practice_prod` |
+| Secret JWT | généré pour ce service | généré à part, distinct |
+
+Le plan `starter` est payant. Render le demande au moment d'appliquer le Blueprint.
+
+Quand cet environnement sert de vrais utilisateurs, il reste à faire dans le tableau de bord, hors du fichier :
+
+- Activer des adresses IP de sortie fixes et limiter Atlas à ces adresses. Retirer `0.0.0.0/0`.
+- Ajouter les noms de domaine (`app.exemple.fr`, `api.exemple.fr`). `CORS_ORIGIN` suit déjà l'URL du site de production.
+- Sortir la base de production de l'offre M0 pour avoir des sauvegardes.
 
 ## Mise en œuvre
 
-1. Sur Atlas, créer un cluster M0 en `eu-central-1`, un utilisateur, la base `exam_practice_preprod`, et autoriser `0.0.0.0/0`. Copier la chaîne de connexion.
-2. Pousser la branche `pre-production` (elle doit contenir ce dépôt, dont `render.yaml`).
+1. Sur Atlas, créer un cluster M0 en `eu-central-1`, un utilisateur, les bases `exam_practice_preprod` et `exam_practice_prod`, et autoriser `0.0.0.0/0`. Copier la chaîne de connexion.
+2. Pousser les branches que Render suit. Chacune doit contenir `.github/workflows/ci-cd.yml` : sans ce pipeline, `checksPass` ne déploie pas.
 
 ```powershell
 git checkout -b pre-production
 git push -u origin pre-production
+git checkout -b production
+git push -u origin production
 ```
 
 3. Dans le tableau de bord Render : **New → Blueprint**, choisir le dépôt, puis appliquer `render.yaml`.
-4. Quand Render demande `MONGODB_URI`, coller la chaîne Atlas telle quelle (`mongodb+srv://...mongodb.net`, sans nom de base).
-5. Attendre que les deux services soient verts. Ouvrir l'URL du site `exam-practice-web`.
-6. Créer un compte, une tâche, la modifier, la supprimer. Vérifier `https://<api>.onrender.com/api/health` : la réponse attendue est `{"status":"ok","db":"up"}`.
+4. Quand Render demande `MONGODB_URI`, une fois par API, coller la chaîne Atlas telle quelle (`mongodb+srv://...mongodb.net`, sans nom de base).
+5. La première poussée lance GitHub Actions. Render déploie quand ce pipeline est vert. Ouvrir l'URL du site `exam-practice-web`.
+6. Créer un compte, une tâche, la modifier, la supprimer. Vérifier `https://<api>.onrender.com/api/health` : la réponse attendue est `{"status":"ok","db":"up"}`. Répéter sur `exam-practice-web-prod` après une poussée sur `production`.
 
 Si le site affiche « Impossible de contacter le serveur » au premier déploiement, relancer le déploiement du site statique : l'URL de l'API est figée dans le build React. Si l'API répond « Origine non autorisée », relancer l'API une fois l'URL du site connue.
 
-Chaque poussée sur `pre-production` redéploie le service dont les fichiers ont changé (`backend/**` ou `frontend/**`).
+Une poussée ne déploie que le service dont les fichiers ont changé (`backend/**` ou `frontend/**`), et seulement si le pipeline décrit dans `docs/ci-cd.md` est vert.

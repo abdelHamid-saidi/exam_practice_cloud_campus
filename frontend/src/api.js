@@ -2,9 +2,9 @@ import axios from "axios";
 
 // URL de l'API. En local et dans Docker elle se termine déjà par /api.
 // Sur Render, REACT_APP_API_URL est l'origine publique du service (sans chemin).
-function apiBaseUrl() {
-  const configured = (process.env.REACT_APP_API_URL || "http://localhost:5000/api").replace(/\/$/, "");
-  return configured.endsWith("/api") ? configured : `${configured}/api`;
+export function apiBaseUrl(configured = process.env.REACT_APP_API_URL || "http://localhost:5000/api") {
+  const value = String(configured).replace(/\/$/, "");
+  return value.endsWith("/api") ? value : `${value}/api`;
 }
 
 // Client HTTP. Ajoute le jeton de session à chaque appel vers l'API.

@@ -2,6 +2,16 @@
 
 Toutes les modifications notables de ce projet sont notées ici.
 
+## [1.3.0] - 2026-11-27
+
+### Ajouts
+
+- Pipeline GitHub Actions (`.github/workflows/ci-cd.yml`) : installation, tests, audit du backend, construction des images et publication sur GHCR pour les branches `pre-production` et `production`.
+- Render ne déploie plus au commit. Les deux environnements attendent un pipeline vert (`checksPass`).
+- Environnement Render `production` : API `exam-practice-api-prod` (plan `starter`, sans mise en veille), site `exam-practice-web-prod`, base `exam_practice_prod`.
+- Tests de l'API (`node --test`) et de l'interface (Jest) utilisés comme porte du déploiement.
+- Description du pipeline dans `docs/ci-cd.md`.
+
 ## [1.2.0] - 2026-11-27
 
 ### Ajouts
