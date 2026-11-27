@@ -2,6 +2,25 @@
 
 Toutes les modifications notables de ce projet sont notées ici.
 
+## [1.3.0] - 2026-11-27
+
+### Ajouts
+
+- Pipeline GitHub Actions (`.github/workflows/ci-cd.yml`) : installation, tests, audit du backend, construction des images et publication sur GHCR pour les branches `pre-production` et `production`.
+- Render ne déploie plus au commit. Les deux environnements attendent un pipeline vert (`checksPass`).
+- Environnement Render `production` : API `exam-practice-api-prod` (plan `starter`, sans mise en veille), site `exam-practice-web-prod`, base `exam_practice_prod`.
+- Tests de l'API (`node --test`) et de l'interface (Jest) utilisés comme porte du déploiement.
+- Description du pipeline dans `docs/ci-cd.md`.
+
+## [1.2.0] - 2026-11-27
+
+### Ajouts
+
+- Environnement de qualification Render : `render.yaml` (site statique et API Node, branche `pre-production`, région Francfort).
+- Analyse du choix Render et MongoDB Atlas dans `docs/hebergement-render.md`.
+- Le client HTTP ajoute `/api` lorsque `REACT_APP_API_URL` ne contient que l'origine du service.
+- L'API accepte la chaîne Atlas `MONGODB_URI` et y ajoute `MONGO_DB_NAME` (`exam_practice_preprod` sur Render). `MONGO_URI` reste prioritaire en local et avec Docker.
+
 ## [1.1.0] - 2026-11-27
 
 ### Ajouts

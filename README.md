@@ -137,15 +137,11 @@ Ces points concernent l'infrastructure et l'automatisation.
 
 **Pistes de réflexion :**
 - **Conteneurisation (E24)** : en place. `backend/Dockerfile` et `frontend/Dockerfile` construisent les deux applications. `docker-compose.yml` orchestre ces services avec MongoDB. Le détail du lancement est dans la section 1.
-- **CI/CD (E24)** : Comment automatiser le déploiement ? Écrivez un petit script `deploy.sh` ou décrivez les étapes d'un pipeline (ex: GitHub Actions, GitLab CI) qui pourrait :
-    1.  Installer les dépendances.
-    2.  Lancer les tests (que vous pourriez écrire !).
-    3.  Construire les images Docker.
-    4.  Pousser les images vers un registre (Docker Hub, etc.).
+- **CI/CD (E24)** : en place. `.github/workflows/ci-cd.yml` installe les dépendances, lance les tests, construit les images Docker et les publie sur GHCR. Render déploie la qualification (branche `pre-production`) et la production (branche `production`) seulement si ce pipeline est vert. Le détail est dans `docs/ci-cd.md`.
 - **Journalisation (Logging) (E25)** : Les `console.log` actuels sont-ils suffisants ? Proposez une solution de logging plus robuste (ex: Winston, Pino) pour le backend, qui pourrait logger dans des fichiers ou envoyer les logs vers un service centralisé.
 - **Monitoring et alertes (E26)** : Comment surveiller que l'application est en bonne santé ? Proposez des outils (ex. : Prometheus, Grafana, Uptime Kuma) et définissez 2 ou 3 alertes pertinentes (ex. : « API indisponible », « latence > 500 ms », « taux d'erreur > 5 % »). Vous pouvez aussi décrire les solutions proposées par l'hébergeur choisi.
 
-- **Hébergement, DNS, Sécurité (E21, E22, E23)** : Décrivez une architecture cible sur un fournisseur cloud (ex: AWS, Azure, GCP, Scaleway...). Où hébergeriez-vous les conteneurs ? La base de données ? Comment configureriez-vous le nom de domaine et le certificat HTTPS ?
+- **Hébergement, DNS, Sécurité (E21, E22, E23)** : qualification et production sont définies pour Render. L'analyse et les étapes de mise en service sont dans `docs/hebergement-render.md`. Le fichier `render.yaml` décrit le site statique et l'API pour les branches `pre-production` et `production`. La base reste sur MongoDB Atlas.
 
 ---
 
